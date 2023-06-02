@@ -27,13 +27,11 @@ export async function deleteNotification (
   const response = await fetch(
     `https://api.green-api.com/waInstance${ idInstance }/deleteNotification/${ apiTokenInstance }/${ receiptId }`,
     { method: 'DELETE', })
-  console.log('response', response)
   if (!response.ok) {
     if (response.status === 401) return error<ResultError>({ code: 'Unauthorized' })
     return error<ResultError>({ code: 'Unknown' })
   }
   const data = await response.json()
-  console.log('data', data)
 
   if (data?.result) return success('deleted' as const)
   return success('empty' as const)

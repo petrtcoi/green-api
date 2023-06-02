@@ -16,7 +16,7 @@ export function SendMessage (): JSX.Element {
   const [ idInstance ] = useAtom(idInstanceAtom)
   const [ apiTokenInstance ] = useAtom(apiTokenInstanceAtom)
   const [ activeChat ] = useAtom(activeChatAtom)
-  const [ _messageList, setMessagesList ] = useAtom(messageListAtom)
+  const [ , setMessagesList ] = useAtom(messageListAtom)
 
 
   const [ message, setMessage ] = useState<string>('')
@@ -34,14 +34,16 @@ export function SendMessage (): JSX.Element {
     e.preventDefault()
     setErrorMessage('')
     if (!apiTokenInstance || !idInstance || !activeChat) return
-    setLoading(true)
 
+    setLoading(true)
     const sendMessageQuery = await sendMessage({
       idInstance, apiTokenInstance, message, phoneNumber: activeChat
     })
+    setLoading(false)
+
     if (isError(sendMessageQuery)) {
       setErrorMessage(sendMessageQuery.payload.code)
-      setLoading(false)
+      setTimeout(() => setErrorMessage(''), 2000)
       return
     }
     // get timestamp now

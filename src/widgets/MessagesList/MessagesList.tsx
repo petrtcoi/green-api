@@ -16,8 +16,13 @@ export default function MessageList (): JSX.Element {
   const bottomMessageList = document.getElementById('bottom-message-list')
 
   useEffect(() => {
-    setMessages(messageList.filter(m => m.chatId === activeChat))
+    setMessages(
+      messageList
+        .filter(m => m.chatId === activeChat)
+        .sort((a, b) => a.timestamp - b.timestamp)
+    )
     setTimeout(() => { bottomMessageList?.scrollIntoView({ behavior: 'smooth' }) }, 200)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ activeChat, messageList ])
 
 

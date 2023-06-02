@@ -31,17 +31,21 @@ export async function receiveNotification (
 
   const { idInstance, apiTokenInstance } = props
 
-  const response = await fetch(
-    `https://api.green-api.com/waInstance${ idInstance }/receiveNotification/${ apiTokenInstance }`,
-    { method: 'GET' })
+  let data
 
-  if (!response.ok) {
-    if (response.status === 401) return error<ResultError>({ code: 'Unauthorized' })
-    return error<ResultError>({ code: 'Unknown' })
+  try {
+    const response = await fetch(
+      `https://api.green-api.com/waInstance${ idInstance }/receiveNotification/${ apiTokenInstance }`,
+      { method: 'GET' })
+    if (response.status === 401 || response.status === 403) return error<ResultError>({ code: 'Unauthorized' })
+    data = await response.json()
+  } catch (err) {
+    // return error<ResultError>({ code: 'Unknown' })
+    // TODO Cant get proper information about error if wrong credentials
+    return error<ResultError>({ code: 'Unauthorized' })
   }
 
-  const data = await response.json()
-  console.log('receive data', data)
+
   if (data === null) return success({})
   if (data.body.typeWebhook !== INCOMING_MESSAGE_STATUS) {
     return success({ receiptId: data.receiptId })

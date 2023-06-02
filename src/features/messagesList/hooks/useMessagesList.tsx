@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAtom } from "jotai"
 
 import { receiveNotification } from "@/shared/services/greenApi"
@@ -10,47 +10,38 @@ import { chatListAtom } from "@/entities/chats"
 import { messageListAtom } from '@/entities/messages'
 import { idInstanceAtom, apiTokenInstanceAtom } from "@/entities/credentials"
 
-const REFRESH_PERIOD_SECONDS = 5 * 1000
+const REFRESH_PERIOD_SECONDS = 3 * 1000
 
 
-//TODO use as react-singleton-hook ?
-
-/** Must be invoked only once at App level */
+/** Must be invoked only once at App level */            //TODO use as react-singleton-hook ?
 export function useMessagesList () {
+
   const [ chatList ] = useAtom(chatListAtom)
   const [ idInstance ] = useAtom(idInstanceAtom)
   const [ apiTokenInstance ] = useAtom(apiTokenInstanceAtom)
-  const [ _messageList, setMessagesList ] = useAtom(messageListAtom)
+  const [ , setMessagesList ] = useAtom(messageListAtom)
 
-  const [ isUpdating, setIsUpdating ] = useState<boolean>(false)
-  const [ errorMessage, setErrorMessage ] = useState<string>('')
   const [ badCredentialsError, setBadCredentialsError ] = useState<boolean>(false)
 
 
 
   /** Recursive function get and delete last notification */
-  async function updateMessages () {
-    if (!idInstance || !apiTokenInstance) return
+  const updateMessages = useCallback(async (_idInstance = '', _apiTokenInstance = '') => {
+
+    if (!_idInstance || !_apiTokenInstance) return
     if (badCredentialsError) return
 
-    setErrorMessage('')
-    setIsUpdating(true)
-
     /** Get Last Notification */
-    const receiveNotificationQuery = await receiveNotification({ idInstance, apiTokenInstance })
-
+    const receiveNotificationQuery = await receiveNotification({
+      idInstance: _idInstance,
+      apiTokenInstance: _apiTokenInstance
+    })
     if (isError(receiveNotificationQuery)) {
-      if (receiveNotificationQuery.payload.code === 'Unauthorized') {
-        setErrorMessage('Please check idInstance and apiTokenInstance')
-        setBadCredentialsError(true)
-        return
-      }
-      setErrorMessage(receiveNotificationQuery.payload.code)  // TODO function convert code to message
+      if (receiveNotificationQuery.payload.code === 'Unauthorized') setBadCredentialsError(true)
       return
     }
 
-    const data = receiveNotificationQuery.payload
-    const { message, receiptId } = data
+    const { message, receiptId } = receiveNotificationQuery.payload
 
     if (message) {
       setMessagesList(prev => {
@@ -59,20 +50,17 @@ export function useMessagesList () {
       })
     }
 
-    // Delete last message
     if (receiptId) {
-      // TODO add delete notification handler ?
-      const deleteNotificationQuery = await deleteNotification({ idInstance, apiTokenInstance, receiptId })
-      if (isError(deleteNotificationQuery)) {
-        setErrorMessage(`Error delete notification: ${ deleteNotificationQuery.payload.code }`)
-      }
-      updateMessages() /** If is was not last message - check for next one */
+      await deleteNotification({                  // TODO add deleteNotification error handler ?
+        idInstance: _idInstance,
+        apiTokenInstance: _apiTokenInstance,
+        receiptId
+      })
+      updateMessages()
     }
 
-
-    setIsUpdating(false)
     return
-  }
+  }, [ badCredentialsError, setMessagesList ])
 
   /** Credentials updated */
   useEffect(() => {
@@ -82,15 +70,16 @@ export function useMessagesList () {
 
   /** Check new messages each N seconds */
   useEffect(() => {
-    if (!chatList.length || isUpdating) return
-    const interval = setInterval(updateMessages, REFRESH_PERIOD_SECONDS)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ chatList ])
+    if (!chatList.length) return
+    if (badCredentialsError) return
 
-  useEffect(() => {
-    console.log('messageList', _messageList)
-  }, [ _messageList ])
+    const interval = setInterval(
+      async () => await updateMessages(idInstance ?? '', apiTokenInstance ?? ''),
+      REFRESH_PERIOD_SECONDS
+    )
+
+    return () => clearInterval(interval)
+  }, [ chatList, badCredentialsError, idInstance, apiTokenInstance, updateMessages ])
 
 
 }
